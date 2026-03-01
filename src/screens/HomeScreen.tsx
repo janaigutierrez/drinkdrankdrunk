@@ -3,7 +3,6 @@ import {
   Alert,
   Animated,
   Easing,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HomeScreenProps } from '../navigation/AppNavigator';
 import ModeCard, { ModeConfig } from '../components/ModeCard';
