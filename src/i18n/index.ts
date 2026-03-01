@@ -1,4 +1,3 @@
-import { getLocales } from 'expo-localization';
 import en from './en';
 import es from './es';
 import ca from './ca';
@@ -11,13 +10,11 @@ let currentLang: LangCode = 'es';
 
 function detectLanguage(): LangCode {
   try {
-    const locales = getLocales();
-    if (locales && locales.length > 0) {
-      const code = locales[0].languageCode?.toLowerCase() ?? 'es';
-      if (code === 'ca') return 'ca';
-      if (code === 'es') return 'es';
-      return 'en';
-    }
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale;
+    const code = locale.split('-')[0].toLowerCase();
+    if (code === 'ca') return 'ca';
+    if (code === 'es') return 'es';
+    return 'en';
   } catch {
     // ignore
   }
