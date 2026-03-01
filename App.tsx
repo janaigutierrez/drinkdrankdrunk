@@ -1,5 +1,4 @@
-import 'react-native-reanimated'; // must be first import
-import 'react-native-gesture-handler'; // must be imported before navigation
+import 'react-native-gesture-handler';
 
 import React from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
