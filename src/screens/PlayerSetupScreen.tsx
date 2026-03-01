@@ -1,7 +1,9 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Platform,
   Pressable,
   SafeAreaView,
@@ -11,23 +13,51 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  UIManager,
   View,
 } from 'react-native';
-import Animated, {
-  FadeInDown,
-  FadeOutUp,
-  Layout,
-} from 'react-native-reanimated';
 
 import { PlayerSetupScreenProps } from '../navigation/AppNavigator';
 import { useGame, Player } from '../context/GameContext';
 import { colors, fontSize, fontWeight, radius, shadow, spacing } from '../theme/theme';
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const MAX_PLAYERS = 8;
 const MIN_PLAYERS = 2;
 
 function createPlayer(name: string): Player {
   return { id: Date.now().toString() + Math.random().toString(36).slice(2), name };
+}
+
+// Wrapper that fades + slides in on mount
+function FadeInRow({
+  delay,
+  style,
+  children,
+}: {
+  delay: number;
+  style?: object;
+  children: React.ReactNode;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 250, delay, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 250, delay, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={[style, { opacity, transform: [{ translateY }] }]}>
+      {children}
+    </Animated.View>
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -48,11 +78,13 @@ export default function PlayerSetupScreen({ navigation }: PlayerSetupScreenProps
 
   function addPlayer() {
     if (players.length >= MAX_PLAYERS) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
     setPlayers((prev) => [...prev, createPlayer('')]);
   }
 
   function removePlayer(id: string) {
     if (players.length <= MIN_PLAYERS) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
     setPlayers((prev) => prev.filter((p) => p.id !== id));
   }
 
@@ -97,13 +129,7 @@ export default function PlayerSetupScreen({ navigation }: PlayerSetupScreenProps
           showsVerticalScrollIndicator={false}
         >
           {players.map((player, index) => (
-            <Animated.View
-              key={player.id}
-              entering={FadeInDown.duration(250).delay(index * 40)}
-              exiting={FadeOutUp.duration(200)}
-              layout={Layout.springify()}
-              style={styles.playerRow}
-            >
+            <FadeInRow key={player.id} delay={index * 40} style={styles.playerRow}>
               {/* Number badge */}
               <View style={styles.numberBadge}>
                 <Text style={styles.numberText}>{index + 1}</Text>
@@ -139,7 +165,7 @@ export default function PlayerSetupScreen({ navigation }: PlayerSetupScreenProps
                   <Text style={styles.removeBtnText}>✕</Text>
                 </Pressable>
               )}
-            </Animated.View>
+            </FadeInRow>
           ))}
 
           {/* Add player row */}

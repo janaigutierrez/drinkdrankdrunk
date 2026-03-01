@@ -1,22 +1,13 @@
 /**
  * ChallengeCard
  *
- * The hero component of the game. Shows one challenge at a time.
+ * Shows one challenge at a time.
  * Animates in on mount and animates out when the user advances.
- * Uses Reanimated for smooth 60fps transitions.
+ * Swipe left/right (or tap Next) to advance.
  */
 
-import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-  runOnJS,
-} from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, PanResponder, StyleSheet, Text, View } from 'react-native';
 
 import { Challenge } from '../data/challenges';
 import { colors, fontSize, fontWeight, radius, shadow, spacing } from '../theme/theme';
@@ -57,101 +48,136 @@ export default function ChallengeCard({
   totalCards,
   onNext,
 }: ChallengeCardProps) {
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(30);
-  const translateX = useSharedValue(0);
-  const cardScale = useSharedValue(0.95);
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(30)).current;
+  const translateX = useRef(new Animated.Value(0)).current;
+  const cardScale = useRef(new Animated.Value(0.95)).current;
 
   // Animate in on mount / challenge change
   useEffect(() => {
-    opacity.value = 0;
-    translateY.value = 30;
-    cardScale.value = 0.95;
-    translateX.value = 0;
+    opacity.setValue(0);
+    translateY.setValue(30);
+    cardScale.setValue(0.95);
+    translateX.setValue(0);
 
-    opacity.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.quad) });
-    translateY.value = withTiming(0, { duration: 350, easing: Easing.out(Easing.back(1.2)) });
-    cardScale.value = withTiming(1, { duration: 350, easing: Easing.out(Easing.back(1.2)) });
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 300,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 350,
+        easing: Easing.out(Easing.back(1.2)),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardScale, {
+        toValue: 1,
+        duration: 350,
+        easing: Easing.out(Easing.back(1.2)),
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, [challenge.id]);
 
   function animateOut(direction: 'left' | 'right', callback: () => void) {
     const target = direction === 'left' ? -400 : 400;
-    opacity.value = withTiming(0, { duration: 250 });
-    translateX.value = withTiming(target, { duration: 280, easing: Easing.in(Easing.quad) }, () => {
-      runOnJS(callback)();
-    });
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+      Animated.timing(translateX, {
+        toValue: target,
+        duration: 280,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(() => callback());
   }
 
-  // Swipe gesture
-  const pan = Gesture.Pan()
-    .onUpdate((e) => {
-      translateX.value = e.translationX;
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, { dx, dy }) =>
+        Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10,
+      onPanResponderMove: (_, { dx }) => {
+        translateX.setValue(dx);
+      },
+      onPanResponderRelease: (_, { dx }) => {
+        if (Math.abs(dx) > SWIPE_THRESHOLD) {
+          animateOut(dx > 0 ? 'right' : 'left', onNext);
+        } else {
+          Animated.spring(translateX, {
+            toValue: 0,
+            damping: 15,
+            stiffness: 300,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateX, {
+          toValue: 0,
+          damping: 15,
+          stiffness: 300,
+          useNativeDriver: true,
+        }).start();
+      },
     })
-    .onEnd((e) => {
-      if (Math.abs(e.translationX) > SWIPE_THRESHOLD) {
-        const dir = e.translationX > 0 ? 'right' : 'left';
-        runOnJS(animateOut)(dir, onNext);
-      } else {
-        // Snap back
-        translateX.value = withSpring(0, { damping: 15, stiffness: 300 });
-      }
-    });
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [
-      { translateY: translateY.value },
-      { translateX: translateX.value },
-      { scale: cardScale.value },
-    ],
-  }));
+  ).current;
 
   const accentColor = INTENSITY_COLOR[challenge.intensity];
 
   return (
-    <GestureDetector gesture={pan}>
-      <Animated.View style={[styles.card, animatedStyle]}>
-        {/* Top accent bar */}
-        <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
+    <Animated.View
+      style={[
+        styles.card,
+        {
+          opacity,
+          transform: [{ translateY }, { translateX }, { scale: cardScale }],
+        },
+      ]}
+      {...panResponder.panHandlers}
+    >
+      {/* Top accent bar */}
+      <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
 
-        <View style={styles.body}>
-          {/* Header row */}
-          <View style={styles.header}>
-            <View style={[styles.typePill, { borderColor: accentColor }]}>
-              <Text style={styles.typeEmoji}>{TYPE_EMOJI[challenge.type]}</Text>
-              <Text style={[styles.typeLabel, { color: accentColor }]}>
-                {challenge.type.toUpperCase()}
-              </Text>
-            </View>
-
-            <Text style={styles.intensityLabel}>{INTENSITY_LABEL[challenge.intensity]}</Text>
+      <View style={styles.body}>
+        {/* Header row */}
+        <View style={styles.header}>
+          <View style={[styles.typePill, { borderColor: accentColor }]}>
+            <Text style={styles.typeEmoji}>{TYPE_EMOJI[challenge.type]}</Text>
+            <Text style={[styles.typeLabel, { color: accentColor }]}>
+              {challenge.type.toUpperCase()}
+            </Text>
           </View>
 
-          {/* Challenge text */}
-          <Text style={styles.challengeText}>{challenge.text}</Text>
-
-          {/* Sips indicator */}
-          {challenge.sips !== undefined && (
-            <View style={styles.sipsRow}>
-              <Text style={styles.sipsEmoji}>
-                {'🍺'.repeat(Math.min(challenge.sips, 4))}
-              </Text>
-              <Text style={styles.sipsText}>
-                {challenge.sips === 1 ? '1 sip' : `${challenge.sips} sips`}
-              </Text>
-            </View>
-          )}
+          <Text style={styles.intensityLabel}>{INTENSITY_LABEL[challenge.intensity]}</Text>
         </View>
 
-        {/* Progress indicator */}
-        <View style={styles.footer}>
-          <Text style={styles.progressText}>
-            {cardNumber} / {totalCards}
-          </Text>
-          <Text style={styles.swipeHint}>Swipe or tap Next →</Text>
-        </View>
-      </Animated.View>
-    </GestureDetector>
+        {/* Challenge text */}
+        <Text style={styles.challengeText}>{challenge.text}</Text>
+
+        {/* Sips indicator */}
+        {challenge.sips !== undefined && (
+          <View style={styles.sipsRow}>
+            <Text style={styles.sipsEmoji}>
+              {'🍺'.repeat(Math.min(challenge.sips, 4))}
+            </Text>
+            <Text style={styles.sipsText}>
+              {challenge.sips === 1 ? '1 sip' : `${challenge.sips} sips`}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Progress indicator */}
+      <View style={styles.footer}>
+        <Text style={styles.progressText}>
+          {cardNumber} / {totalCards}
+        </Text>
+        <Text style={styles.swipeHint}>Swipe or tap Next →</Text>
+      </View>
+    </Animated.View>
   );
 }
 

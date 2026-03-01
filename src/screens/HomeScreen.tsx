@@ -1,6 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   Alert,
+  Animated,
+  Easing,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -9,13 +11,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withTiming,
-} from 'react-native-reanimated';
 
 import { HomeScreenProps } from '../navigation/AppNavigator';
 import ModeCard, { ModeConfig } from '../components/ModeCard';
@@ -24,7 +19,6 @@ import { useGame } from '../context/GameContext';
 import { colors, fontSize, fontWeight, radius, spacing } from '../theme/theme';
 
 // ─── Game modes config ────────────────────────────────────────────────────────
-// Add new modes here. isLocked controls visibility. unlockHint shown in card.
 
 const GAME_MODES: ModeConfig[] = [
   {
@@ -89,21 +83,30 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const { profile } = state;
 
   // Entrance animation
-  const titleOpacity = useSharedValue(0);
-  const titleY = useSharedValue(-20);
-  const contentOpacity = useSharedValue(0);
+  const titleOpacity = useRef(new Animated.Value(0)).current;
+  const titleY = useRef(new Animated.Value(-20)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    titleOpacity.value = withDelay(100, withTiming(1, { duration: 500 }));
-    titleY.value = withDelay(100, withTiming(0, { duration: 500, easing: Easing.out(Easing.quad) }));
-    contentOpacity.value = withDelay(300, withTiming(1, { duration: 500 }));
+    Animated.parallel([
+      Animated.sequence([
+        Animated.delay(100),
+        Animated.parallel([
+          Animated.timing(titleOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+          Animated.timing(titleY, {
+            toValue: 0,
+            duration: 500,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+      Animated.sequence([
+        Animated.delay(300),
+        Animated.timing(contentOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+      ]),
+    ]).start();
   }, []);
-
-  const titleStyle = useAnimatedStyle(() => ({
-    opacity: titleOpacity.value,
-    transform: [{ translateY: titleY.value }],
-  }));
-  const contentStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
 
   function handleModePress(mode: ModeConfig) {
     if (mode.isLocked) {
@@ -129,12 +132,14 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Header ── */}
-        <Animated.View style={[styles.header, titleStyle]}>
+        <Animated.View
+          style={[styles.header, { opacity: titleOpacity, transform: [{ translateY: titleY }] }]}
+        >
           <Text style={styles.appName}>🍺 Drink Drank Drunk</Text>
           <Text style={styles.tagline}>The night starts here</Text>
         </Animated.View>
 
-        <Animated.View style={[styles.body, contentStyle]}>
+        <Animated.View style={[styles.body, { opacity: contentOpacity }]}>
           {/* ── XP / Level Bar ── */}
           <XPBar
             level={level}

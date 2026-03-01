@@ -1,11 +1,5 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
 import { colors, fontSize, fontWeight, radius, spacing } from '../theme/theme';
 import { Level } from '../utils/xp';
@@ -17,18 +11,21 @@ interface XPBarProps {
 }
 
 export default function XPBar({ level, progress, totalXP }: XPBarProps) {
-  const fillWidth = useSharedValue(0);
+  const fillAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    fillWidth.value = withTiming(progress, {
+    Animated.timing(fillAnim, {
+      toValue: progress,
       duration: 900,
       easing: Easing.out(Easing.quad),
-    });
+      useNativeDriver: false,
+    }).start();
   }, [progress]);
 
-  const fillStyle = useAnimatedStyle(() => ({
-    width: `${fillWidth.value * 100}%`,
-  }));
+  const widthStyle = fillAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   return (
     <View style={styles.container}>
@@ -43,7 +40,7 @@ export default function XPBar({ level, progress, totalXP }: XPBarProps) {
 
       {/* Bar */}
       <View style={styles.barTrack}>
-        <Animated.View style={[styles.barFill, fillStyle]} />
+        <Animated.View style={[styles.barFill, { width: widthStyle }]} />
       </View>
 
       {/* XP counter */}

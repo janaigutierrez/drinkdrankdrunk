@@ -1,10 +1,5 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import React, { useRef } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, fontSize, fontWeight, radius, shadow, spacing } from '../theme/theme';
 
@@ -15,7 +10,7 @@ export interface ModeConfig {
   description: string;
   color: string;
   isLocked: boolean;
-  unlockHint?: string; // e.g. "Level 3" or "Premium"
+  unlockHint?: string;
 }
 
 interface ModeCardProps {
@@ -26,23 +21,29 @@ interface ModeCardProps {
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function ModeCard({ mode, onPress }: ModeCardProps) {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+  const scale = useRef(new Animated.Value(1)).current;
 
   function handlePressIn() {
-    scale.value = withSpring(0.96, { damping: 15, stiffness: 400 });
+    Animated.spring(scale, {
+      toValue: 0.96,
+      damping: 15,
+      stiffness: 400,
+      useNativeDriver: true,
+    }).start();
   }
 
   function handlePressOut() {
-    scale.value = withSpring(1, { damping: 15, stiffness: 400 });
+    Animated.spring(scale, {
+      toValue: 1,
+      damping: 15,
+      stiffness: 400,
+      useNativeDriver: true,
+    }).start();
   }
 
   return (
     <AnimatedPressable
-      style={[styles.card, animatedStyle, mode.isLocked && styles.cardLocked]}
+      style={[styles.card, { transform: [{ scale }] }, mode.isLocked && styles.cardLocked]}
       onPress={() => onPress(mode)}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
